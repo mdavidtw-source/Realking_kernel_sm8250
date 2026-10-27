@@ -1,0 +1,43 @@
+YAML
+name: Build RealKing Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev zip ccache git-core libncurses5-dev
+          git clone https://github.com/kdrag0n/proton-clang.git --depth=1 $HOME/proton-clang
+
+      - name: Build Kernel
+        run: |
+          export PATH="$HOME/proton-clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CC=clang
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+
+          make O=out vendor/apolio_defconfig || make O=out vendor/kona-perf_defconfig
+          make -j$(nproc) O=out
+
+      - name: Zip Kernel
+        run: |
+          git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 AnyKernel3
+          cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/ || cp out/arch/arm64/boot/Image.gz AnyKernel3/ || cp out/arch/arm64/boot/Image AnyKernel3/
+          cd AnyKernel3
+          zip -r9 ../RealKing-Kernel-Apolio.zip * -x .git\* README.md
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: RealKing-Kernel-Apolio
+          path: RealKing-Kernel-Apolio.zip
